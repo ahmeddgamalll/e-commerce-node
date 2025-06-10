@@ -12,7 +12,20 @@ class CartController {
                 WHERE ci.user_id = ?`,
                 [req.user.id]
             );
-            res.json({ items });
+
+            // Calculate cart totals
+            const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const tax = Number((subtotal * 0.10).toFixed(2)); // 10% tax rate
+            const shipping = 15; // Flat rate shipping
+            const total = Number((subtotal + tax + shipping).toFixed(2));
+
+            res.json({
+                items,
+                subtotal: Number(subtotal.toFixed(2)),
+                tax,
+                shipping,
+                total
+            });
         } catch (error) {
             console.error('Error fetching cart:', error);
             res.status(500).json({ message: 'Error fetching cart items' });

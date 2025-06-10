@@ -193,4 +193,83 @@ describe('CartController', () => {
             });
         });
     });
+
+    describe('Cart Calculations', () => {
+        test('should calculate cart totals correctly', async () => {
+            const mockCartItems = [
+                {
+                    id: 1,
+                    product_id: 1,
+                    quantity: 2,
+                    product_name: 'Product 1',
+                    price: 10.99,
+                    image_url: 'test1.jpg'
+                },
+                {
+                    id: 2,
+                    product_id: 2,
+                    quantity: 1,
+                    product_name: 'Product 2',
+                    price: 20.99,
+                    image_url: 'test2.jpg'
+                }
+            ];
+
+            db.query.mockResolvedValueOnce([mockCartItems]);
+
+            await CartController.getCart(mockReq, mockRes);
+
+            const response = mockRes.json.mock.calls[0][0];
+            const items = response.items;
+
+            // Calculate expected values
+            const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const tax = subtotal * 0.10; // 10% tax rate
+            const shipping = 15; // Flat rate shipping
+            const total = subtotal + tax + shipping;
+
+            expect(response).toHaveProperty('subtotal', subtotal);
+            expect(response).toHaveProperty('tax', tax);
+            expect(response).toHaveProperty('shipping', shipping);
+            expect(response).toHaveProperty('total', total);
+        });
+
+        test('should handle empty cart calculations', async () => {
+            db.query.mockResolvedValueOnce([[]]);
+
+            await CartController.getCart(mockReq, mockRes);
+
+            const response = mockRes.json.mock.calls[0][0];
+
+            expect(response).toHaveProperty('subtotal', 0);
+            expect(response).toHaveProperty('tax', 0);
+            expect(response).toHaveProperty('shipping', 15); // Shipping still applies
+            expect(response).toHaveProperty('total', 15); // Just shipping cost
+        });
+
+        test('should round calculations to 2 decimal places', async () => {
+            const mockCartItems = [
+                {
+                    id: 1,
+                    product_id: 1,
+                    quantity: 3,
+                    product_name: 'Product 1',
+                    price: 10.333,
+                    image_url: 'test1.jpg'
+                }
+            ];
+
+            db.query.mockResolvedValueOnce([mockCartItems]);
+
+            await CartController.getCart(mockReq, mockRes);
+
+            const response = mockRes.json.mock.calls[0][0];
+
+            // Verify all monetary values are rounded to 2 decimal places
+            expect(response.subtotal).toBe(31.00); // 10.333 * 3 = 30.999 rounded to 31.00
+            expect(response.tax).toBe(3.10); // 31.00 * 0.10 = 3.10
+            expect(response.shipping).toBe(15.00);
+            expect(response.total).toBe(49.10); // 31.00 + 3.10 + 15.00
+        });
+    });
 });
